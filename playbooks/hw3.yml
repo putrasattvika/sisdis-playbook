@@ -28,6 +28,14 @@
     - name: install requests with pip
       command: pip install requests
 
+    - name: add lapor IP script
+      template:
+        src: ../templates/bootscript.sh.j2
+        dest: /root/bootscript.sh
+        owner: root
+        group: root
+        mode: 0755
+
     - name: clone HW3 repository
       git:
         repo: "{{ git_origin }}"
