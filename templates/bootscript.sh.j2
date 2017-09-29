@@ -3,4 +3,4 @@
 curl "http://172.17.0.1/lapor.php?ip=`ifconfig eth0 | grep "inet addr" | cut -d: -f2 | grep -Pio "[0-9.]+"`&npm=1406527532"
 
 supervisord
-supervisorctl restart simple-http-server
+supervisorctl restart all
