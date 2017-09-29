@@ -1,0 +1,19 @@
+[program:simple-http-server]
+
+command=python2 main.py -p 5000 -h 0.0.0.0
+process_name=%(program_name)s
+directory=/home/{{app_runner}}/hw1-http-server
+user=sattvika
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/supervisor/simple-http-server.out
+stdout_logfile_maxbytes=1MB
+stdout_logfile_backups=10
+stdout_capture_maxbytes=1MB
+stdout_events_enabled=false
+stderr_logfile=/var/log/supervisor/simple-http-server.err
+stderr_logfile_maxbytes=1MB
+stderr_logfile_backups=10
+stderr_capture_maxbytes=1MB
+stderr_events_enabled=false

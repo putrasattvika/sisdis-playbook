@@ -1,0 +1,79 @@
+---
+
+- hosts: docker-1
+  remote_user: sattvika
+  gather_facts: false   # don't gather facts yet in case if python 2 isn't installed yet
+  become: true
+
+  vars:
+    app_runner: "sattvika"
+    git_origin: "ssh://git@gitlab.com/sattvika/simple-http-server.git"
+    common_packages:
+      - vim
+      - git
+      - curl
+      - netcat
+      - net-tools
+      - iputils-ping
+
+  pre_tasks:
+    - name: install python2 for Ansible if not installed
+      raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal)
+      register: pyinstall_output
+      changed_when: pyinstall_output.stdout != ""
+
+    - setup: # this run gather_facts
+  
+  tasks:
+    - name: install common packages
+      apt: name={{item}} state=installed update_cache=yes
+      with_items: 
+        - "{{ common_packages }}"
+
+    - name: add lapor IP script
+      template:
+        src: ../templates/bootscript.sh.j2
+        dest: /root/bootscript.sh
+        owner: root
+        group: root
+        mode: 0755
+
+    - name: clone HW1 repository
+      git:
+        repo: "{{ git_origin }}"
+        dest: "/home/{{app_runner}}/hw1-http-server"
+        accept_hostkey: yes
+        key_file: "/home/{{app_runner}}/.ssh/id_rsa"
+      become_user: "{{ app_runner }}"
+
+    - name: install supervisord
+      apt: name=supervisor state=installed
+
+    - name: stop supervisord
+      command: pkill supervisord
+      ignore_errors: yes
+
+    - name: add supervisord config
+      template:
+        src: ../templates/supervisord.conf.j2
+        dest: /etc/supervisord.conf
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: start supervisord
+      command: supervisord
+      ignore_errors: yes
+
+    - name: add simple-http-server program config
+      template:
+        src: ../templates/simple-http-server.conf.j2
+        dest: /etc/supervisor/conf.d/simple-http-server.conf
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: start simple-http-server
+      supervisorctl:
+        name: simple-http-server
+        state: restarted
