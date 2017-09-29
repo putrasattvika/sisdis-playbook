@@ -1,0 +1,69 @@
+---
+
+- hosts: docker-1
+  remote_user: sattvika
+  gather_facts: false   # don't gather facts yet in case if python 2 isn't installed yet
+  become: true
+
+  vars:
+    app_runner: "sattvika"
+    git_origin: "ssh://git@gitlab.com/sattvika/sisdis-hw3-rest.git"
+    needed_packages:
+      - python-pip
+
+  pre_tasks:
+    - name: install python2 for Ansible if not installed
+      raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal)
+      register: pyinstall_output
+      changed_when: pyinstall_output.stdout != ""
+
+    - setup: # this run gather_facts
+  
+  tasks:
+    - name: install common packages
+      apt: name={{item}} state=installed update_cache=yes
+      with_items: 
+        - "{{ needed_packages }}"
+
+    - name: install requests with pip
+      command: pip install requests
+
+    - name: clone HW3 repository
+      git:
+        repo: "{{ git_origin }}"
+        dest: "/home/{{app_runner}}/hw3-rest-server"
+        accept_hostkey: yes
+        key_file: "/home/{{app_runner}}/.ssh/id_rsa"
+      become_user: "{{ app_runner }}"
+
+    - name: install supervisord
+      apt: name=supervisor state=installed
+
+    - name: stop supervisord
+      command: pkill supervisord
+      ignore_errors: yes
+
+    - name: add supervisord config
+      template:
+        src: ../templates/supervisord.conf.j2
+        dest: /etc/supervisord.conf
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: start supervisord
+      command: supervisord
+      ignore_errors: yes
+
+    - name: add rest-server program config
+      template:
+        src: ../templates/rest-server.conf.j2
+        dest: /etc/supervisor/conf.d/rest-server.conf
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: start rest-server
+      supervisorctl:
+        name: rest-server
+        state: restarted
