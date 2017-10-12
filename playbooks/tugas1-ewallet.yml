@@ -1,0 +1,77 @@
+---
+
+- hosts: docker-1
+  remote_user: sattvika
+  gather_facts: false   # don't gather facts yet in case if python 2 isn't installed yet
+  become: true
+
+  vars:
+    app_runner: "sattvika"
+    git_origin: "ssh://git@github.com/putrasattvika/sisdis-ewallet.git"
+    packages:
+      - python-pip
+
+  pre_tasks:
+    - name: install python2 for Ansible if not installed
+      raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal)
+      register: pyinstall_output
+      changed_when: pyinstall_output.stdout != ""
+
+    - setup: # this run gather_facts
+  
+  tasks:
+    - name: install packages
+      apt: name={{item}} state=installed update_cache=yes
+      with_items: 
+        - "{{ packages }}"
+
+    - name: add bootscript
+      template:
+        src: ../templates/bootscript.sh.j2
+        dest: /root/bootscript.sh
+        owner: root
+        group: root
+        mode: 0755
+
+    - name: install supervisord
+      apt: name=supervisor state=installed
+
+    - name: stop supervisord
+      command: pkill supervisord
+      ignore_errors: yes
+
+    - name: clone Tugas1 repository
+      git:
+        repo: "{{ git_origin }}"
+        dest: "/home/{{app_runner}}/ewallet"
+        accept_hostkey: yes
+        key_file: "/home/{{app_runner}}/.ssh/id_rsa"
+      become_user: "{{ app_runner }}"
+
+    - name: install python modules
+      command: "pip2 install -r /home/{{app_runner}}/ewallet/requirements.txt"
+
+    - name: add supervisord config
+      template:
+        src: ../templates/supervisord.conf.j2
+        dest: /etc/supervisord.conf
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: start supervisord
+      command: supervisord
+      ignore_errors: yes
+
+    - name: add ewallet program config
+      template:
+        src: ../templates/ewallet.conf.j2
+        dest: /etc/supervisor/conf.d/ewallet.conf
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: start ewallet
+      supervisorctl:
+        name: ewallet
+        state: restarted
